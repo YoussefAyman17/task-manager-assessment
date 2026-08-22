@@ -1,8 +1,17 @@
 const express = require("express");
 const mongoose = require("mongoose");
 
+const authRoutes = require("./routes/authRoutes");
+const globalErrorHandler = require("./controllers/errorController");
+
 const app = express();
+
 app.use(express.json());
+app.use("api/auth", authRoutes);
+app.all("*", (req, res, next) => {
+  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
+});
+app.use(globalErrorHandler);
 
 mongoose
   .connect(process.env.MONGODB_URI)
