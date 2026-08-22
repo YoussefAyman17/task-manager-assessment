@@ -20,6 +20,7 @@ import {
   DialogActions,
   TextField,
   MenuItem,
+  InputAdornment,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -28,6 +29,8 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
 import AssignmentTurnedInOutlinedIcon from "@mui/icons-material/AssignmentTurnedInOutlined";
 import CloseIcon from "@mui/icons-material/Close";
+import SearchIcon from "@mui/icons-material/Search";
+import FilterListIcon from "@mui/icons-material/FilterList";
 
 const initialFormData = {
   title: "",
@@ -42,6 +45,13 @@ const Dashboard = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterPriority, setFilterPriority] = useState("All");
+  const [sortBy, setSortBy] = useState("Newest");
+
   // Modal State
   const [openModal, setOpenModal] = useState(false);
   const [formData, setFormData] = useState(initialFormData);
@@ -49,12 +59,25 @@ const Dashboard = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  useEffect(() => {
     fetchTasks();
-  }, []);
+  }, [debouncedSearch, filterStatus, filterPriority]);
 
   const fetchTasks = async () => {
+    setLoading(true);
     try {
-      const response = await api.get("/tasks");
+      let query = "?";
+      if (filterStatus !== "All") query += `status=${filterStatus}&`;
+      if (filterPriority !== "All") query += `priority=${filterPriority}&`;
+      if (debouncedSearch) query += `search=${debouncedSearch}`;
+
+      const response = await api.get(`/tasks${query}`);
       setTasks(response.data.data);
     } catch (error) {
       toast.error("Failed to fetch tasks");
@@ -74,10 +97,18 @@ const Dashboard = () => {
     }
   };
 
-  // --- MODAL HANDLERS ---
+  const getSortedTasks = () => {
+    let sorted = [...tasks];
+    if (sortBy === "Oldest") {
+      sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    } else if (sortBy === "Due Date") {
+      sorted.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+    }
+    return sorted;
+  };
+
   const handleOpenModal = (task = null) => {
     if (task) {
-      // Edit Mode: Populate the form. Note: HTML date inputs require YYYY-MM-DD format
       setFormData({
         title: task.title,
         description: task.description,
@@ -89,7 +120,6 @@ const Dashboard = () => {
       });
       setEditingId(task._id);
     } else {
-      // Create Mode: Reset form
       setFormData(initialFormData);
       setEditingId(null);
     }
@@ -109,24 +139,16 @@ const Dashboard = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-
     try {
       if (editingId) {
-        // UPDATE Existing Task (PATCH)
-        const response = await api.patch(`/tasks/${editingId}`, formData);
+        await api.patch(`/tasks/${editingId}`, formData);
         toast.success("Task updated successfully");
-        // Update the specific task in local state instantly
-        setTasks(
-          tasks.map((t) => (t._id === editingId ? response.data.data : t)),
-        );
       } else {
-        // CREATE New Task (POST)
-        const response = await api.post("/tasks", formData);
+        await api.post("/tasks", formData);
         toast.success("Task created successfully");
-        // Add the new task to the top of the list
-        setTasks([response.data.data, ...tasks]);
       }
       handleCloseModal();
+      fetchTasks();
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to save task");
     } finally {
@@ -134,10 +156,8 @@ const Dashboard = () => {
     }
   };
 
-  // Get today's date in YYYY-MM-DD for the HTML date picker minimum value
   const today = new Date().toISOString().split("T")[0];
 
-  // Custom styling for tags
   const getStatusStyle = (status) => {
     switch (status) {
       case "Done":
@@ -159,6 +179,8 @@ const Dashboard = () => {
         return { bgcolor: "#F3F4F6", color: "#374151" };
     }
   };
+
+  const sortedTasks = getSortedTasks();
 
   return (
     <Box sx={styles.pageBackground}>
@@ -230,8 +252,10 @@ const Dashboard = () => {
           sx={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
+            alignItems: "flex-start",
             mb: 4,
+            flexWrap: "wrap",
+            gap: 2,
           }}
         >
           <Box>
@@ -256,11 +280,116 @@ const Dashboard = () => {
           </Button>
         </Box>
 
+        {/* --- SEARCH & FILTER BAR --- */}
+        <Paper elevation={0} sx={styles.filterBar}>
+          <Grid container spacing={2} alignItems="center">
+            {/* Search Input */}
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search tasks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon sx={{ color: "#94A3B8" }} />
+                    </InputAdornment>
+                  ),
+                  sx: { borderRadius: "8px", bgcolor: "white" },
+                }}
+              />
+            </Grid>
+
+            {/* Filter Controls */}
+            <Grid
+              item
+              xs={12}
+              md={8}
+              sx={{
+                display: "flex",
+                gap: 2,
+                flexWrap: "wrap",
+                justifyContent: { xs: "flex-start", md: "flex-end" },
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <FilterListIcon sx={{ color: "#94A3B8", fontSize: 20 }} />
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  fontWeight="600"
+                >
+                  Filters:
+                </Typography>
+              </Box>
+
+              <TextField
+                select
+                size="small"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                sx={{
+                  minWidth: 130,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "8px",
+                    bgcolor: "white",
+                  },
+                }}
+              >
+                <MenuItem value="All">All Statuses</MenuItem>
+                <MenuItem value="To Do">To Do</MenuItem>
+                <MenuItem value="In Progress">In Progress</MenuItem>
+                <MenuItem value="Done">Done</MenuItem>
+              </TextField>
+
+              <TextField
+                select
+                size="small"
+                value={filterPriority}
+                onChange={(e) => setFilterPriority(e.target.value)}
+                sx={{
+                  minWidth: 130,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "8px",
+                    bgcolor: "white",
+                  },
+                }}
+              >
+                <MenuItem value="All">All Priorities</MenuItem>
+                <MenuItem value="Low">Low</MenuItem>
+                <MenuItem value="Medium">Medium</MenuItem>
+                <MenuItem value="High">High</MenuItem>
+              </TextField>
+
+              <TextField
+                select
+                size="small"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                sx={{
+                  minWidth: 130,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "8px",
+                    bgcolor: "white",
+                  },
+                }}
+              >
+                <MenuItem value="Newest">Sort: Newest</MenuItem>
+                <MenuItem value="Oldest">Sort: Oldest</MenuItem>
+                <MenuItem value="Due Date">Sort: Due Date</MenuItem>
+              </TextField>
+            </Grid>
+          </Grid>
+        </Paper>
+        {/* --- END SEARCH & FILTER BAR --- */}
+
         {loading ? (
           <Box sx={{ display: "flex", justifyContent: "center", mt: 10 }}>
             <CircularProgress sx={{ color: "primary.main" }} />
           </Box>
-        ) : tasks.length === 0 ? (
+        ) : sortedTasks.length === 0 ? (
           <Paper elevation={0} sx={styles.emptyState}>
             <AssignmentTurnedInOutlinedIcon
               sx={{ fontSize: 48, color: "#CBD5E1", mb: 2 }}
@@ -271,27 +400,35 @@ const Dashboard = () => {
               color="#0F172A"
               gutterBottom
             >
-              No tasks yet
+              {searchQuery || filterStatus !== "All" || filterPriority !== "All"
+                ? "No matching tasks found"
+                : "No tasks yet"}
             </Typography>
             <Typography variant="body2" color="#64748B" sx={{ mb: 3 }}>
-              Get started by creating a new task to manage your workflow.
+              {searchQuery || filterStatus !== "All" || filterPriority !== "All"
+                ? "Try adjusting your search or filters."
+                : "Get started by creating a new task to manage your workflow."}
             </Typography>
-            <Button
-              variant="outlined"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenModal()}
-              sx={{
-                borderRadius: "8px",
-                textTransform: "none",
-                fontWeight: 600,
-              }}
-            >
-              Create your first task
-            </Button>
+            {!searchQuery &&
+              filterStatus === "All" &&
+              filterPriority === "All" && (
+                <Button
+                  variant="outlined"
+                  startIcon={<AddIcon />}
+                  onClick={() => handleOpenModal()}
+                  sx={{
+                    borderRadius: "8px",
+                    textTransform: "none",
+                    fontWeight: 600,
+                  }}
+                >
+                  Create your first task
+                </Button>
+              )}
           </Paper>
         ) : (
           <Grid container spacing={3}>
-            {tasks.map((task) => (
+            {sortedTasks.map((task) => (
               <Grid item xs={12} sm={6} md={4} key={task._id}>
                 <Paper elevation={0} sx={styles.taskCard}>
                   <Box
@@ -388,7 +525,7 @@ const Dashboard = () => {
         )}
       </Container>
 
-      {/* CREATE / EDIT MODAL */}
+      {/* CREATE / EDIT MODAL (Unchanged) */}
       <Dialog
         open={openModal}
         onClose={handleCloseModal}
@@ -409,7 +546,6 @@ const Dashboard = () => {
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-
         <Box component="form" onSubmit={handleSubmit}>
           <DialogContent
             dividers
@@ -425,7 +561,6 @@ const Dashboard = () => {
               sx={{ mb: 2.5 }}
               InputProps={{ sx: { borderRadius: "8px" } }}
             />
-
             <TextField
               label="Description"
               name="description"
@@ -437,7 +572,6 @@ const Dashboard = () => {
               sx={{ mb: 2.5 }}
               InputProps={{ sx: { borderRadius: "8px" } }}
             />
-
             <Grid container spacing={2} sx={{ mb: 2.5 }}>
               <Grid item xs={12} sm={6}>
                 <TextField
@@ -470,7 +604,6 @@ const Dashboard = () => {
                 </TextField>
               </Grid>
             </Grid>
-
             <TextField
               label="Due Date"
               name="dueDate"
@@ -479,8 +612,8 @@ const Dashboard = () => {
               onChange={handleChange}
               fullWidth
               required
-              InputLabelProps={{ shrink: true }} // Forces the label to stay above the date picker
-              inputProps={{ min: today }} // Prevents selecting past dates on the frontend
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ min: today }}
               InputProps={{ sx: { borderRadius: "8px" } }}
             />
           </DialogContent>
@@ -546,6 +679,13 @@ const styles = {
     borderRadius: "8px",
     textTransform: "none",
     boxShadow: "0px 4px 14px rgba(124, 58, 237, 0.3)",
+  },
+  filterBar: {
+    p: 2,
+    mb: 4,
+    borderRadius: "16px",
+    border: "1px solid #E2E8F0",
+    background: "rgba(241, 245, 249, 0.5)",
   },
   emptyState: {
     p: 6,
