@@ -1,3 +1,6 @@
+const dns = require("node:dns/promises");
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
+
 const express = require("express");
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
@@ -5,16 +8,17 @@ const dotenv = require("dotenv");
 const authRoutes = require("./routes/authRoutes");
 const taskRoutes = require("./routes/taskRoutes");
 const globalErrorHandler = require("./controllers/errorController");
+const AppError = require("./utils/appError");
 
-dotenv.config({ path: "./convig.env" });
+dotenv.config({ path: "./config.env" });
 const app = express();
 
 app.use(express.json());
 
-app.use("api/auth", authRoutes);
-app.use("api/tasks", taskRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/tasks", taskRoutes);
 
-app.all("*", (req, res, next) => {
+app.use((req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 

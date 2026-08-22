@@ -1,4 +1,5 @@
 const AppError = require("../utils/appError");
+const { promisify } = require("util");
 const asyncHandler = require("../utils/asyncHandler");
 const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
