@@ -53,3 +53,19 @@ task-manager-assessment/
 │   └── .env.example        # Environment variables template
 └── README.md
 ```
+
+## 🧪 Test Account Credentials
+
+If you prefer not to register a new account, you can use the following test credentials:
+
+- **Email:** test@example.com
+- **Password:** password123
+
+## ⚠️ Known Issues / Future Improvements
+
+- **Pagination:** Currently, the dashboard fetches all tasks matching the filters. For a production environment with thousands of tasks, backend and frontend pagination should be implemented.
+- **Refresh Tokens:** The app currently uses a single JWT with a 30-day expiration. A more secure approach for production would be implementing short-lived access tokens with HTTP-only refresh tokens.
+
+## 🤖 Acknowledgments & Disclosures
+
+In accordance with the assessment rules, I want to disclose that AI tools (LLMs) were utilized during the development of this project. They were primarily used as a pair-programming assistant for debugging, generating boilerplate Material UI component structures, and refining the CSS/theme design. All core architectural decisions, database modeling, and business logic were actively guided and implemented by me, and I am fully prepared to explain every line of code during the technical review.
