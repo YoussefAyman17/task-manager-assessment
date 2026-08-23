@@ -58,6 +58,11 @@ const Dashboard = () => {
   const [editingId, setEditingId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Delete Modal State
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchQuery);
@@ -153,6 +158,33 @@ const Dashboard = () => {
       toast.error(error.response?.data?.message || "Failed to save task");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // --- DELETE MODAL HANDLERS ---
+  const handleOpenDeleteModal = (id) => {
+    setTaskToDelete(id);
+    setDeleteModalOpen(true);
+  };
+
+  const handleCloseDeleteModal = () => {
+    setDeleteModalOpen(false);
+    setTaskToDelete(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!taskToDelete) return;
+    setIsDeleting(true);
+
+    try {
+      await api.delete(`/tasks/${taskToDelete}`);
+      toast.success("Task deleted successfully");
+      setTasks(tasks.filter((task) => task._id !== taskToDelete));
+      handleCloseDeleteModal();
+    } catch (error) {
+      toast.error("Failed to delete task");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -471,7 +503,7 @@ const Dashboard = () => {
                             color: "#94A3B8",
                             "&:hover": { color: "#EF4444" },
                           }}
-                          onClick={() => handleDelete(task._id)}
+                          onClick={() => handleOpenDeleteModal(task._id)}
                         >
                           <DeleteOutlinedIcon fontSize="small" />
                         </IconButton>
@@ -646,6 +678,51 @@ const Dashboard = () => {
             </Button>
           </DialogActions>
         </Box>
+      </Dialog>
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <Dialog
+        open={deleteModalOpen}
+        onClose={handleCloseDeleteModal}
+        PaperProps={{ sx: { borderRadius: "16px", p: 1, maxWidth: "400px" } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: "#0F172A" }}>
+          Delete Task?
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Are you sure you want to delete this task? This action cannot be
+            undone and the task will be permanently removed from your dashboard.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={handleCloseDeleteModal}
+            disabled={isDeleting}
+            sx={{ color: "#64748B", fontWeight: 600, textTransform: "none" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            variant="contained"
+            color="error"
+            disabled={isDeleting}
+            sx={{
+              borderRadius: "8px",
+              px: 3,
+              textTransform: "none",
+              fontWeight: 600,
+              boxShadow: "0px 4px 14px rgba(239, 68, 68, 0.3)",
+            }}
+          >
+            {isDeleting ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              "Yes, Delete"
+            )}
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );
